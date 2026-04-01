@@ -1,0 +1,33 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+trends = pd.read_csv('ai_tools_comparison.csv')
+
+date_col = trends.columns[0]
+tool_cols = trends.columns[1:].tolist()
+
+trends[date_col] = pd.to_datetime(trends[date_col])
+trends = trends.set_index(date_col)
+
+most_consistent_tool = trends[tool_cols].pct_change().std().idxmin()
+
+trends.reset_index(inplace=True)
+
+plt.figure(figsize=(12, 5))
+for col in tool_cols:
+    plt.plot(trends[date_col], trends[col], label=col)
+plt.legend()
+plt.title('AI Tools Interest Over Time')
+plt.show()
+
+chatgpt_col = next(c for c in tool_cols if 'chat' in c.lower() or 'gpt' in c.lower())
+gpt_dip = trends.loc[trends[chatgpt_col].idxmin(), date_col].strftime('%B %Y')
+
+trends['Month'] = trends[date_col].dt.month
+monthly = trends.groupby('Month')[tool_cols].mean()
+monthly['avg'] = monthly.mean(axis=1)
+best_month = pd.Timestamp(2024, monthly['avg'].idxmax(), 1).strftime('%B')
+
+print("most_consistent_tool:", most_consistent_tool)
+print("gpt_dip:", gpt_dip)
+print("best_month:", best_month)
