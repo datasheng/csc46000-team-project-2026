@@ -9,13 +9,15 @@ BOROUGH_CENTROIDS = pd.DataFrame(
     }
 )
 
+NUMERIC_FEATURES = ["vol", "hour", "temperature_2m", "precipitation"]
+
 
 def _clean_model_inputs(df, feature_cols):
     cleaned = df.copy()
     categorical_cols = [
         col
         for col in feature_cols
-        if col not in ["hour", "temperature_2m", "precipitation"]
+        if col not in NUMERIC_FEATURES
     ]
     for col in categorical_cols:
         if col in cleaned.columns:
@@ -57,6 +59,15 @@ def build_tableau_tables(
         "direction",
         "vol",
         "expected_volume",
+        "p75_volume",
+        "p90_volume",
+        "volume_ratio",
+        "volume_delta",
+        "congestion_score",
+        "is_moderate_congestion",
+        "is_volume_spike",
+        "weather_pressure",
+        "delay_score",
         "delay_index",
         "delay_minutes",
         "predicted_delay_minutes",
@@ -143,6 +154,7 @@ def _build_today_weather_predictions(rush_df, weather_features, weather_model):
             "direction": [rush_df["direction"].mode().iloc[0]] * len(BOROUGH_CENTROIDS),
             "day_of_week": [today.day_name()] * len(BOROUGH_CENTROIDS),
             "hour": [8] * len(BOROUGH_CENTROIDS),
+            "vol": [rush_df["vol"].median()] * len(BOROUGH_CENTROIDS),
             "temperature_2m": [rush_df["temperature_2m"].median()]
             * len(BOROUGH_CENTROIDS),
             "precipitation": [median_precip] * len(BOROUGH_CENTROIDS),
