@@ -6,15 +6,15 @@ Connect Tableau Desktop to MySQL and use the tables created by the final noteboo
 
 | Dashboard | Table | Purpose |
 | --- | --- | --- |
-| Live Traffic Predictions | `tableau_today_weather_predictions` | Forecast-style borough predictions using current or template weather inputs |
-| Live Traffic Predictions | `tableau_live_predictions_by_borough` | Borough-level predicted delay probability, delay index, and hotspot fields |
-| City Weather Comparison | `tableau_weather_delay_summary` | Rain, temperature, season, borough, and delay-risk summaries |
-| A/B Model Results | `tableau_model_results` | Classification and regression model metrics |
-| Detail Drilldown | `tableau_ml_predictions_detail` | Row-level rush-hour prediction detail |
+| Live Predictions | `tableau_today_weather_predictions` | Forecast-style borough delay-minute predictions using template/current weather inputs |
+| Live Predictions | `tableau_live_predictions` | Row-level rush-hour actual vs predicted delay minutes |
+| Live Predictions | `tableau_live_predictions_by_borough` | Borough-level predicted delay minutes, rainy share, coordinates, and delay level |
+| City Comparison | `tableau_city_comparison` | Borough and rain-intensity comparison for precipitation, delay minutes, and traffic pattern shifts |
+| A/B Results | `tableau_ab_results` | Model A baseline vs Model B precipitation-aware regression metrics |
 
-## Dashboard 1: Live Traffic Predictions
+## Dashboard 1: Live Predictions
 
-Use `tableau_today_weather_predictions` for the live forecast view.
+Use `tableau_today_weather_predictions` and `tableau_live_predictions_by_borough`.
 
 Recommended worksheets:
 
@@ -23,82 +23,82 @@ Recommended worksheets:
    - Rows: `latitude`
    - Marks: Circle or Map
    - Detail: `boro`
-   - Color: `predicted_delay_probability`
-   - Size: `predicted_delay_probability`
-   - Tooltip: `boro`, `hour`, `temperature_2m`, `precipitation`, `congestion_level`
+   - Color: `predicted_delay_minutes`
+   - Size: `predicted_delay_minutes`
+   - Tooltip: `boro`, `hour`, `temperature_2m`, `precipitation`, `delay_level`
 
 2. **Predicted Delay by Borough**
    - Columns: `boro`
-   - Rows: `predicted_delay_probability`
-   - Color: `congestion_level`
-   - Sort descending by `predicted_delay_probability`
+   - Rows: `avg_predicted_delay_minutes`
+   - Color: `delay_level`
+   - Sort descending by `avg_predicted_delay_minutes`
 
-3. **Congestion KPI Tiles**
-   - Highest predicted borough
-   - Average predicted delay probability
-   - Number of severe boroughs
+3. **Live KPI Tiles**
+   - Highest predicted delay borough
+   - Average predicted delay minutes
+   - Rainy record share
    - Forecast hour
 
 Suggested calculated field:
 
 ```tableau
-Severe Borough Flag =
-IF [congestion_level] = "Severe" THEN 1 ELSE 0 END
+Severe Delay Flag =
+IF [delay_level] = "Severe" THEN 1 ELSE 0 END
 ```
 
-## Dashboard 2: City Weather Comparison
+## Dashboard 2: City Comparison
 
-Use `tableau_weather_delay_summary`.
+Use `tableau_city_comparison`.
 
 Recommended worksheets:
 
-1. **Rain vs Delay by Borough**
+1. **Rain Intensity by Borough**
    - Columns: `boro`
-   - Rows: `delay_risk_rate`
+   - Rows: `avg_delay_minutes`
    - Color: `rain_intensity`
 
-2. **Seasonal Delay Trend**
-   - Columns: `season`
-   - Rows: `avg_delay_index`
-   - Color: `boro`
-
-3. **Weather Heatmap**
+2. **Predicted Delay Heatmap**
    - Columns: `rain_intensity`
-   - Rows: `temp_bin`
-   - Color: `delay_risk_rate`
-   - Label: `delay_risk_rate`
-   - Filter: `boro`, `season`
+   - Rows: `boro`
+   - Color: `avg_predicted_delay_minutes`
+   - Label: `avg_predicted_delay_minutes`
 
-4. **Weather Impact Table**
-   - Rows: `boro`, `season`
-   - Measures: `avg_temperature`, `avg_precipitation`, `delay_risk_rate`, `avg_delay_index`
+3. **Weather Impact Scatter**
+   - Columns: `avg_precipitation`
+   - Rows: `avg_delay_minutes`
+   - Color: `boro`
+   - Size: `records`
 
-## Dashboard 3: A/B Model Results
+4. **Comparison Table**
+   - Rows: `boro`, `rain_intensity`
+   - Measures: `records`, `avg_precipitation`, `avg_temperature`, `avg_delay_minutes`, `avg_predicted_delay_minutes`
 
-Use `tableau_model_results`.
+## Dashboard 3: A/B Results
+
+Use `tableau_ab_results`.
 
 Recommended worksheets:
 
-1. **Classification Model Comparison**
-   - Filter: `model_type = classification`
-   - Columns: `model`
-   - Rows: `accuracy`, `precision`, `recall`, `f1`, `roc_auc`
+1. **Model Error Comparison**
+   - Columns: `ab_group`
+   - Rows: `mae`, `rmse`
+   - Lower values are better
 
-2. **Regression Model Comparison**
-   - Filter: `model_type = regression`
-   - Columns: `model`
-   - Rows: `rmse`, `r2`
+2. **Model Fit Comparison**
+   - Columns: `ab_group`
+   - Rows: `r2`
+   - Higher values are better
 
 3. **Best Model Recommendation**
    - Text: `model`
    - Filter: `recommendation = Recommended`
-   - Tooltip: `selection_score`, `model_type`
+   - Tooltip: `mae`, `rmse`, `r2`
 
 4. **Metric Tiles**
-   - Best ROC-AUC
-   - Best F1
+   - Lowest MAE
    - Lowest RMSE
    - Highest R2
+   - Recommended model
 
 Suggested calculated field:
 
@@ -120,6 +120,5 @@ Run the notebook in this order:
 The intended flow is:
 
 ```text
-Weather/traffic APIs -> Python ML pipeline -> MySQL Tableau tables -> Tableau dashboards
+Weather/traffic APIs -> precipitation-delay regression -> MySQL Tableau tables -> Tableau dashboards
 ```
-
