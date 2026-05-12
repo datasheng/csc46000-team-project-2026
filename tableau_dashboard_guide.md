@@ -53,9 +53,11 @@ Use `tableau_city_comparison`.
 Recommended worksheets:
 
 1. **Rain Intensity by Borough**
-   - Columns: `boro`
-   - Rows: `avg_delay_minutes`
-   - Color: `rain_intensity`
+   - Columns: `rain_intensity`
+   - Rows: `boro`
+   - Color: `records` or `total_precipitation`
+   - Label: `records`
+   - Tooltip: `avg_precipitation`, `max_precipitation`, `total_precipitation`
 
 2. **Predicted Delay Heatmap**
    - Columns: `rain_intensity`
@@ -71,7 +73,7 @@ Recommended worksheets:
 
 4. **Comparison Table**
    - Rows: `boro`, `rain_intensity`
-   - Measures: `records`, `avg_precipitation`, `avg_temperature`, `avg_delay_minutes`, `avg_predicted_delay_minutes`
+   - Measures: `records`, `avg_precipitation`, `total_precipitation`, `max_precipitation`, `avg_temperature`, `avg_delay_minutes`, `avg_predicted_delay_minutes`
 
 ## Dashboard 3: A/B Results
 
