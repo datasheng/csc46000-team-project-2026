@@ -39,17 +39,15 @@ def _delay_level(series):
 
 
 def build_tableau_tables(
-    rush_df,
+    active_hours_df,
     rush_scored,
     model_results,
     weather_features,
     weather_model,
-    city_df=None,
 ):
     """Create Tableau-ready tables for the three required dashboards."""
-    rush_df = _clean_model_inputs(rush_df, weather_features)
+    active_hours_df = _clean_model_inputs(active_hours_df, weather_features)
     rush_scored = _clean_model_inputs(rush_scored, weather_features)
-    city_source = rush_scored if city_df is None else city_df.copy()
 
     detail_cols = [
         "date",
@@ -89,7 +87,6 @@ def build_tableau_tables(
     live_predictions["is_raining_flag"] = (
         live_predictions["is_raining"].astype(str).str.lower().eq("true")
     )
-    live_predictions["table_scope"] = "rush_hour_scored_records"
 
     live_by_borough = (
         live_predictions.groupby("boro", as_index=False)
@@ -106,13 +103,8 @@ def build_tableau_tables(
         live_by_borough["avg_predicted_delay_minutes"]
     )
 
-    city_source = _prepare_city_comparison_source(
-        city_source,
-        weather_features,
-        weather_model,
-    )
     city_comparison = (
-        city_source.groupby(["boro", "rain_intensity"], observed=True)
+        rush_scored.groupby(["boro", "rain_intensity"], observed=True)
         .agg(
             records=("delay_minutes", "size"),
             avg_delay_minutes=("delay_minutes", "mean"),
@@ -120,13 +112,10 @@ def build_tableau_tables(
             avg_delay_index=("delay_index", "mean"),
             avg_temperature=("temperature_2m", "mean"),
             avg_precipitation=("precipitation", "mean"),
-            total_precipitation=("precipitation", "sum"),
-            max_precipitation=("precipitation", "max"),
         )
         .reset_index()
         .merge(BOROUGH_CENTROIDS, on="boro", how="left")
     )
-    city_comparison["table_scope"] = "all_city_records"
     city_comparison["delay_level"] = _delay_level(
         city_comparison["avg_predicted_delay_minutes"]
     )
@@ -141,7 +130,7 @@ def build_tableau_tables(
         )
 
     today_weather_predictions = _build_today_weather_predictions(
-        rush_df,
+        active_hours_df,
         weather_features,
         weather_model,
     )
@@ -155,48 +144,22 @@ def build_tableau_tables(
     }
 
 
-def _prepare_city_comparison_source(city_source, weather_features, weather_model):
-    city_source = city_source.copy()
-    if "rain_intensity" not in city_source.columns:
-        city_source["rain_intensity"] = pd.cut(
-            city_source["precipitation"],
-            bins=[-0.001, 0, 0.05, 0.15, float("inf")],
-            labels=["none", "light", "moderate", "heavy"],
-        )
-    city_source = _clean_model_inputs(city_source, weather_features)
-    if "predicted_delay_minutes" not in city_source.columns:
-        city_source["predicted_delay_minutes"] = weather_model.predict(
-            city_source[weather_features]
-        ).clip(min=0)
-    return city_source
-
-
-def _build_today_weather_predictions(rush_df, weather_features, weather_model):
+def _build_today_weather_predictions(active_hours_df, weather_features, weather_model):
     today = pd.Timestamp.today()
-    template = (
-        rush_df.groupby("boro", as_index=False)
-        .agg(
-            street=("street", lambda values: values.mode().iloc[0]),
-            direction=("direction", lambda values: values.mode().iloc[0]),
-            vol=("vol", "median"),
-            temperature_2m=("temperature_2m", "median"),
-            precipitation=("precipitation", "median"),
-        )
-        .merge(BOROUGH_CENTROIDS[["boro"]], on="boro", how="right")
+    median_precip = active_hours_df["precipitation"].median()
+    template = pd.DataFrame(
+        {
+            "boro": BOROUGH_CENTROIDS["boro"],
+            "street": [active_hours_df["street"].mode().iloc[0]] * len(BOROUGH_CENTROIDS),
+            "direction": [active_hours_df["direction"].mode().iloc[0]] * len(BOROUGH_CENTROIDS),
+            "day_of_week": [today.day_name()] * len(BOROUGH_CENTROIDS),
+            "hour": [8] * len(BOROUGH_CENTROIDS),
+            "vol": [active_hours_df["vol"].median()] * len(BOROUGH_CENTROIDS),
+            "temperature_2m": [active_hours_df["temperature_2m"].median()]
+            * len(BOROUGH_CENTROIDS),
+            "precipitation": [median_precip] * len(BOROUGH_CENTROIDS),
+        }
     )
-    template["street"] = template["street"].fillna(rush_df["street"].mode().iloc[0])
-    template["direction"] = template["direction"].fillna(
-        rush_df["direction"].mode().iloc[0]
-    )
-    template["vol"] = template["vol"].fillna(rush_df["vol"].median())
-    template["temperature_2m"] = template["temperature_2m"].fillna(
-        rush_df["temperature_2m"].median()
-    )
-    template["precipitation"] = template["precipitation"].fillna(
-        rush_df["precipitation"].median()
-    )
-    template["day_of_week"] = today.day_name()
-    template["hour"] = 8
     template["is_raining"] = template["precipitation"] > 0
     template["rain_intensity"] = pd.cut(
         template["precipitation"],
@@ -209,7 +172,6 @@ def _build_today_weather_predictions(rush_df, weather_features, weather_model):
     ).clip(min=0)
     template["delay_level"] = _delay_level(template["predicted_delay_minutes"])
     template = template.merge(BOROUGH_CENTROIDS, on="boro", how="left")
-    template["prediction_source"] = "borough_median_template_inputs"
     return template
 
 
